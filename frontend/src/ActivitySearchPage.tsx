@@ -436,7 +436,7 @@ const AddActivityModal = ({
 
     const fetchTrips = async () => {
       try {
-        const response = await axios.get<{ trips: Trip[] }>('/trips', {
+        const response = await axios.get<{ trips: Trip[] }>('/api/trips', {
           headers: { Authorization: `Bearer ${token}` },
         })
         setTrips(response.data.trips)
@@ -462,7 +462,7 @@ const AddActivityModal = ({
         setLoadingStops(true)
         setStops([])
         setStopId('')
-        const response = await axios.get<{ stops: Stop[] }>(`/trips/${tripId}/itinerary`, {
+        const response = await axios.get<{ stops: Stop[] }>(`/api/trips/${tripId}/itinerary`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         setStops(response.data.stops)
@@ -492,7 +492,7 @@ const AddActivityModal = ({
     try {
       setSubmitting(true)
       await axios.post(
-        `/trips/${tripId}/stops/${stopId}/activities`,
+        `/api/trips/${tripId}/stops/${stopId}/activities`,
         {
           title: activity.title,
           description: `${activity.description} Category: ${activity.category}. Best time: ${activity.bestTime}.`,

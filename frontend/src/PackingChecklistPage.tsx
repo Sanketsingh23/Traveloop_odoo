@@ -45,7 +45,7 @@ const PackingChecklistPage = () => {
       try {
         setLoading(true)
         setError('')
-        const response = await axios.get<ChecklistResponse>('/checklist', { headers: { Authorization: `Bearer ${token}` } })
+        const response = await axios.get<ChecklistResponse>('/api/checklist', { headers: { Authorization: `Bearer ${token}` } })
         setItems(response.data.items)
       } catch (err) {
         const axiosError = err as AxiosError<{ message?: string }>
@@ -78,7 +78,7 @@ const PackingChecklistPage = () => {
     try {
       setSaving(true)
       setError('')
-      const response = await axios.post<ChecklistItemResponse>('/checklist', { title: nextTitle, category }, { headers })
+      const response = await axios.post<ChecklistItemResponse>('/api/checklist', { title: nextTitle, category }, { headers })
       setItems((current) => [response.data.item, ...current])
       setTitle('')
       showMessage('Item added.')
@@ -94,7 +94,7 @@ const PackingChecklistPage = () => {
     if (!headers) return
 
     try {
-      const response = await axios.put<ChecklistItemResponse>(`/checklist/${item.id}`, { packed: !item.packed }, { headers })
+      const response = await axios.put<ChecklistItemResponse>(`/api/checklist/${item.id}`, { packed: !item.packed }, { headers })
       setItems((current) => current.map((currentItem) => currentItem.id === item.id ? response.data.item : currentItem))
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
@@ -106,7 +106,7 @@ const PackingChecklistPage = () => {
     if (!headers) return
 
     try {
-      await axios.delete(`/checklist/${id}`, { headers })
+      await axios.delete(`/api/checklist/${id}`, { headers })
       setItems((current) => current.filter((item) => item.id !== id))
       showMessage('Item removed.')
     } catch (err) {
@@ -122,7 +122,7 @@ const PackingChecklistPage = () => {
 
     try {
       setSaving(true)
-      await Promise.all(items.map((item) => axios.delete(`/checklist/${item.id}`, { headers })))
+      await Promise.all(items.map((item) => axios.delete(`/api/checklist/${item.id}`, { headers })))
       setItems([])
       setFilter('All')
       showMessage('Checklist reset.')

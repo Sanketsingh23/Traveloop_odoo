@@ -33,7 +33,7 @@ const EditTripPage = ({ tripId }: EditTripPageProps) => {
 
     const fetchTrip = async () => {
       try {
-        const response = await axios.get(`/trips/${tripId}`, {
+        const response = await axios.get(`/api/trips/${tripId}`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         const trip = response.data.trip
@@ -103,7 +103,7 @@ const EditTripPage = ({ tripId }: EditTripPageProps) => {
 
     try {
       setSubmitting(true)
-      await axios.put(`/trips/${tripId}`, formData, {
+      await axios.put(`/api/trips/${tripId}`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

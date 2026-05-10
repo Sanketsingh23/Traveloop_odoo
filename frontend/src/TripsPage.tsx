@@ -54,7 +54,7 @@ const TripsPage = () => {
     const fetchTrips = async () => {
       try {
         setLoading(true)
-        const response = await axios.get<ApiResponse>('/trips', {
+        const response = await axios.get<ApiResponse>('/api/trips', {
           headers: { Authorization: `Bearer ${token}` },
         })
         setTrips(response.data.trips)
@@ -102,7 +102,7 @@ const TripsPage = () => {
     if (!confirmed) return
 
     try {
-      await axios.delete(`/trips/${id}`, {
+      await axios.delete(`/api/trips/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       setTrips((current) => current.filter((trip) => trip.id !== id))

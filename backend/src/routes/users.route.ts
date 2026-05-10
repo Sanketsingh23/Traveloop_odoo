@@ -4,31 +4,12 @@ import { Router } from 'express'
 import multer from 'multer'
 
 import { authenticate } from '../middleware/auth.js'
-import { pool } from '../db/pool.js'
+import { supabase } from '../db/supabase.js'
+import { resolveAuthenticatedUserId } from '../utils/auth-user.js'
 
 const usersRouter = Router()
 const uploadsDir = path.resolve(process.cwd(), 'uploads')
 const upload = multer({ dest: uploadsDir })
-
-const ensureProfileColumns = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      first_name VARCHAR(100) NOT NULL,
-      last_name VARCHAR(100) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      phone VARCHAR(30) NOT NULL,
-      city VARCHAR(100) NOT NULL,
-      country VARCHAR(100) NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
-
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image VARCHAR(1024)')
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_destinations JSONB NOT NULL DEFAULT \'[]\'::jsonb')
-  await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS travel_preferences JSONB NOT NULL DEFAULT \'[]\'::jsonb')
-}
 
 const safeList = (value: unknown) => {
   if (!Array.isArray(value)) return []
@@ -58,26 +39,20 @@ const mapRowToProfile = (row: any) => ({
 })
 
 usersRouter.get('/profile', authenticate, async (req, res) => {
-  const userId = Number(req.user?.userId)
-
-  if (!Number.isFinite(userId)) {
-    return res.status(404).json({ success: false, message: 'Profile not found' })
-  }
+  const userId = await resolveAuthenticatedUserId(req)
+  if (!userId) return res.status(404).json({ success: false, message: 'Profile not found' })
 
   try {
-    await ensureProfileColumns()
-    const result = await pool.query(
-      `SELECT id, first_name, last_name, email, phone, city, country, profile_image, preferred_destinations, travel_preferences
-       FROM users
-       WHERE id = $1`,
-      [userId],
-    )
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email, phone, city, country, profile_image, preferred_destinations, travel_preferences')
+      .eq('id', userId)
+      .maybeSingle()
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Profile not found' })
-    }
+    if (error) throw error
+    if (!data) return res.status(404).json({ success: false, message: 'Profile not found' })
 
-    return res.status(200).json({ success: true, profile: mapRowToProfile(result.rows[0]) })
+    return res.status(200).json({ success: true, profile: mapRowToProfile(data) })
   } catch (error) {
     console.error('Fetch profile error', error)
     return res.status(500).json({ success: false, message: 'Failed to load profile' })
@@ -85,11 +60,8 @@ usersRouter.get('/profile', authenticate, async (req, res) => {
 })
 
 usersRouter.put('/profile', authenticate, upload.single('profileImage'), async (req, res) => {
-  const userId = Number(req.user?.userId)
-
-  if (!Number.isFinite(userId)) {
-    return res.status(404).json({ success: false, message: 'Profile not found' })
-  }
+  const userId = await resolveAuthenticatedUserId(req)
+  if (!userId) return res.status(404).json({ success: false, message: 'Profile not found' })
 
   const firstName = String(req.body.firstName ?? '').trim()
   const lastName = String(req.body.lastName ?? '').trim()
@@ -105,46 +77,45 @@ usersRouter.put('/profile', authenticate, upload.single('profileImage'), async (
   }
 
   try {
-    await ensureProfileColumns()
-    const existing = await pool.query('SELECT profile_image FROM users WHERE id = $1', [userId])
-    if (existing.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Profile not found' })
-    }
+    const { data: existing, error: existingError } = await supabase
+      .from('users')
+      .select('profile_image')
+      .eq('id', userId)
+      .maybeSingle()
 
-    const duplicate = await pool.query('SELECT id FROM users WHERE email = $1 AND id <> $2', [email, userId])
-    if (duplicate.rowCount && duplicate.rowCount > 0) {
-      return res.status(409).json({ success: false, message: 'Email is already in use' })
-    }
+    if (existingError) throw existingError
+    if (!existing) return res.status(404).json({ success: false, message: 'Profile not found' })
 
-    const profileImage = req.file ? `/uploads/${req.file.filename}` : String(req.body.profileImageUrl ?? existing.rows[0].profile_image ?? '').trim()
-    const result = await pool.query(
-      `UPDATE users
-       SET first_name = $1,
-           last_name = $2,
-           email = $3,
-           phone = $4,
-           city = $5,
-           country = $6,
-           profile_image = $7,
-           preferred_destinations = $8::jsonb,
-           travel_preferences = $9::jsonb
-       WHERE id = $10
-       RETURNING id, first_name, last_name, email, phone, city, country, profile_image, preferred_destinations, travel_preferences`,
-      [
-        firstName,
-        lastName,
+    const { data: duplicate, error: duplicateError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .neq('id', userId)
+      .maybeSingle()
+
+    if (duplicateError) throw duplicateError
+    if (duplicate) return res.status(409).json({ success: false, message: 'Email is already in use' })
+
+    const profileImage = req.file ? `/uploads/${req.file.filename}` : String(req.body.profileImageUrl ?? existing.profile_image ?? '').trim()
+    const { data, error } = await supabase
+      .from('users')
+      .update({
+        first_name: firstName,
+        last_name: lastName,
         email,
         phone,
         city,
         country,
-        profileImage,
-        JSON.stringify(preferredDestinations),
-        JSON.stringify(travelPreferences),
-        userId,
-      ],
-    )
+        profile_image: profileImage,
+        preferred_destinations: preferredDestinations,
+        travel_preferences: travelPreferences,
+      })
+      .eq('id', userId)
+      .select('id, first_name, last_name, email, phone, city, country, profile_image, preferred_destinations, travel_preferences')
+      .single()
 
-    return res.status(200).json({ success: true, profile: mapRowToProfile(result.rows[0]) })
+    if (error) throw error
+    return res.status(200).json({ success: true, profile: mapRowToProfile(data) })
   } catch (error) {
     console.error('Update profile error', error)
     return res.status(500).json({ success: false, message: 'Failed to update profile' })
@@ -152,32 +123,33 @@ usersRouter.put('/profile', authenticate, upload.single('profileImage'), async (
 })
 
 usersRouter.put('/profile/password', authenticate, async (req, res) => {
-  const userId = Number(req.user?.userId)
+  const userId = await resolveAuthenticatedUserId(req)
   const currentPassword = String(req.body.currentPassword ?? '')
   const newPassword = String(req.body.newPassword ?? '')
 
-  if (!Number.isFinite(userId)) {
-    return res.status(404).json({ success: false, message: 'Profile not found' })
-  }
-
+  if (!userId) return res.status(404).json({ success: false, message: 'Profile not found' })
   if (!currentPassword || newPassword.length < 8) {
     return res.status(400).json({ success: false, message: 'Current password and an 8 character new password are required' })
   }
 
   try {
-    await ensureProfileColumns()
-    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId])
-    if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Profile not found' })
-    }
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('password_hash')
+      .eq('id', userId)
+      .maybeSingle()
 
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash)
+    if (fetchError) throw fetchError
+    if (!user) return res.status(404).json({ success: false, message: 'Profile not found' })
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash)
     if (!isCurrentPasswordValid) {
       return res.status(401).json({ success: false, message: 'Current password is incorrect' })
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10)
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId])
+    const { error } = await supabase.from('users').update({ password_hash: passwordHash }).eq('id', userId)
+    if (error) throw error
 
     return res.status(200).json({ success: true, message: 'Password updated successfully' })
   } catch (error) {
@@ -197,21 +169,9 @@ usersRouter.get('/dashboard-stats', authenticate, (_req, res) => {
       remaining: 3380,
     },
     reminders: [
-      {
-        id: 'rem_001',
-        title: 'Visa check for Japan trip',
-        date: '2026-06-20',
-      },
-      {
-        id: 'rem_002',
-        title: 'Book airport transfer for Kyoto',
-        date: '2026-06-28',
-      },
-      {
-        id: 'rem_003',
-        title: 'Travel insurance renewal',
-        date: '2026-07-01',
-      },
+      { id: 'rem_001', title: 'Visa check for Japan trip', date: '2026-06-20' },
+      { id: 'rem_002', title: 'Book airport transfer for Kyoto', date: '2026-06-28' },
+      { id: 'rem_003', title: 'Travel insurance renewal', date: '2026-07-01' },
     ],
   })
 })

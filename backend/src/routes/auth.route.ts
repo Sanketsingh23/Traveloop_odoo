@@ -6,9 +6,9 @@ import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-import { pool } from '../db/pool.js'
 import { env } from '../config/env.js'
 import { findUserByEmail } from '../data/users.js'
+import { requireSupabase, supabase } from '../db/supabase.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -16,7 +16,6 @@ const usersFilePath = path.join(__dirname, '../data/registered-users.json')
 
 const authRouter = Router()
 
-// Load users from file
 const loadRegisteredUsers = async () => {
   try {
     const data = await fs.readFile(usersFilePath, 'utf-8')
@@ -26,31 +25,54 @@ const loadRegisteredUsers = async () => {
   }
 }
 
-// Save users to file
 const saveRegisteredUsers = async (users: any[]) => {
   await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2))
 }
 
-const ensureUsersTable = async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        first_name VARCHAR(100) NOT NULL,
-        last_name VARCHAR(100) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        phone VARCHAR(30) NOT NULL,
-        city VARCHAR(100) NOT NULL,
-        country VARCHAR(100) NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `)
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('Error creating users table:', errorMessage)
-    throw error
-  }
+const signToken = (userId: string | number, email: string) =>
+  jwt.sign(
+    { userId: String(userId), email },
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
+  )
+
+const toAuthUser = (user: any) => ({
+  id: String(user.id),
+  name: `${user.first_name} ${user.last_name}`.trim(),
+  email: user.email,
+})
+
+const toFileAuthUser = (user: any) => ({
+  id: String(user.id),
+  name: `${user.firstName} ${user.lastName}`.trim(),
+  email: user.email,
+})
+
+const findFileUser = async (email: string) => {
+  const registeredUsers = await loadRegisteredUsers()
+  return registeredUsers.find((user: any) => user.email === email)
+}
+
+const migrateFileUser = async (fileUser: any, email: string) => {
+  const { data, error } = await supabase
+    .from('users')
+    .upsert(
+      {
+        first_name: fileUser.firstName,
+        last_name: fileUser.lastName,
+        email,
+        phone: fileUser.phone,
+        city: fileUser.city,
+        country: fileUser.country,
+        password_hash: fileUser.passwordHash,
+      },
+      { onConflict: 'email' },
+    )
+    .select('id, first_name, last_name, email')
+    .single()
+
+  if (error) throw error
+  return data
 }
 
 authRouter.post('/login', async (req, res) => {
@@ -66,168 +88,128 @@ authRouter.post('/login', async (req, res) => {
   const normalizedEmail = email.trim().toLowerCase()
 
   try {
-    await ensureUsersTable()
-    const userResult = await pool.query(
-      `SELECT id, first_name, last_name, email, password_hash
-       FROM users
-       WHERE email = $1`,
-      [normalizedEmail],
-    )
+    requireSupabase()
 
-    if (userResult.rowCount && userResult.rowCount > 0) {
-      const dbUser = userResult.rows[0]
+    const { data: dbUser, error } = await supabase
+      .from('users')
+      .select('id, first_name, last_name, email, password_hash')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+
+    if (error) throw error
+
+    if (dbUser) {
       const isPasswordValid = await bcrypt.compare(password, dbUser.password_hash)
       if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials',
-        })
+        return res.status(401).json({ success: false, message: 'Invalid credentials' })
       }
-
-      const token = jwt.sign(
-        { userId: String(dbUser.id), email: dbUser.email },
-        env.jwtSecret,
-        { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
-      )
 
       return res.status(200).json({
         success: true,
         message: 'Login successful',
-        token,
-        user: {
-          id: String(dbUser.id),
-          name: `${dbUser.first_name} ${dbUser.last_name}`.trim(),
-          email: dbUser.email,
-        },
+        token: signToken(dbUser.id, dbUser.email),
+        user: toAuthUser(dbUser),
       })
     }
-  } catch (dbError) {
-    const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
-    console.error('Database login failed:', dbErrorMessage, 'Falling back to file-based storage...')
 
-    // Fallback to file-based storage
-    try {
-      const registeredUsers = await loadRegisteredUsers()
-      const user = registeredUsers.find((u: any) => u.email === normalizedEmail)
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'Email is not registered',
-        })
-      }
-
-      const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
+    const fileUser = await findFileUser(normalizedEmail)
+    if (fileUser) {
+      const isPasswordValid = await bcrypt.compare(password, fileUser.passwordHash)
       if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials',
-        })
+        return res.status(401).json({ success: false, message: 'Invalid credentials' })
       }
 
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        env.jwtSecret,
-        { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
-      )
+      const migratedUser = await migrateFileUser(fileUser, normalizedEmail)
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        token: signToken(migratedUser.id, migratedUser.email),
+        user: toAuthUser(migratedUser),
+      })
+    }
 
-      console.log('User logged in successfully using file-based storage (fallback mode)')
+    const demoUser = findUserByEmail(normalizedEmail)
+    if (demoUser) {
+      const isPasswordValid = await bcrypt.compare(password, demoUser.passwordHash)
+      if (!isPasswordValid) {
+        return res.status(401).json({ success: false, message: 'Invalid credentials' })
+      }
+
+      const [firstName, ...lastNameParts] = demoUser.name.split(' ')
+      const { data: migratedUser, error: migrationError } = await supabase
+        .from('users')
+        .upsert(
+          {
+            first_name: firstName || 'TravelLoop',
+            last_name: lastNameParts.join(' ') || 'Demo',
+            email: normalizedEmail,
+            phone: '0000000000',
+            city: 'Demo City',
+            country: 'Demo Country',
+            password_hash: demoUser.passwordHash,
+          },
+          { onConflict: 'email' },
+        )
+        .select('id, first_name, last_name, email')
+        .single()
+
+      if (migrationError) throw migrationError
 
       return res.status(200).json({
         success: true,
         message: 'Login successful',
-        token,
-        user: {
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`.trim(),
-          email: user.email,
-        },
+        token: signToken(migratedUser.id, migratedUser.email),
+        user: toAuthUser(migratedUser),
       })
+    }
+
+    return res.status(404).json({ success: false, message: 'Email is not registered' })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Supabase login failed:', errorMessage, 'Falling back to file-based storage...')
+
+    try {
+      const fileUser = await findFileUser(normalizedEmail)
+      if (fileUser) {
+        const isPasswordValid = await bcrypt.compare(password, fileUser.passwordHash)
+        if (!isPasswordValid) {
+          return res.status(401).json({ success: false, message: 'Invalid credentials' })
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Login successful',
+          token: signToken(fileUser.id, fileUser.email),
+          user: toFileAuthUser(fileUser),
+        })
+      }
+
+      const demoUser = findUserByEmail(normalizedEmail)
+      if (demoUser) {
+        const isPasswordValid = await bcrypt.compare(password, demoUser.passwordHash)
+        if (!isPasswordValid) {
+          return res.status(401).json({ success: false, message: 'Invalid credentials' })
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Login successful',
+          token: signToken(demoUser.id, demoUser.email),
+          user: {
+            id: demoUser.id,
+            name: demoUser.name,
+            email: demoUser.email,
+          },
+        })
+      }
+
+      return res.status(404).json({ success: false, message: 'Email is not registered' })
     } catch (fileError) {
       const fileErrorMessage = fileError instanceof Error ? fileError.message : String(fileError)
       console.error('File-based login also failed:', fileErrorMessage)
-      return res.status(500).json({
-        success: false,
-        message: 'Login failed due to server error',
-        error: fileErrorMessage,
-      })
+      return res.status(500).json({ success: false, message: 'Login failed due to server error' })
     }
   }
-
-  // Fallback to demo users if both database and file storage fail
-  const existingUser = findUserByEmail(normalizedEmail)
-  if (!existingUser) {
-    return res.status(404).json({
-      success: false,
-      message: 'Email is not registered',
-    })
-  }
-
-  const isPasswordValid = await bcrypt.compare(password, existingUser.passwordHash)
-  if (!isPasswordValid) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid credentials',
-    })
-  }
-
-  try {
-    await ensureUsersTable()
-    const [firstName, ...lastNameParts] = existingUser.name.split(' ')
-    const insertResult = await pool.query(
-      `INSERT INTO users (first_name, last_name, email, phone, city, country, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-       RETURNING id, first_name, last_name, email`,
-      [
-        firstName || 'TravelLoop',
-        lastNameParts.join(' ') || 'Demo',
-        existingUser.email.toLowerCase(),
-        '0000000000',
-        'Demo City',
-        'Demo Country',
-        existingUser.passwordHash,
-      ],
-    )
-
-    const demoUser = insertResult.rows[0]
-    const token = jwt.sign(
-      { userId: String(demoUser.id), email: demoUser.email },
-      env.jwtSecret,
-      { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
-    )
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      token,
-      user: {
-        id: String(demoUser.id),
-        name: `${demoUser.first_name} ${demoUser.last_name}`.trim(),
-        email: demoUser.email,
-      },
-    })
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('Demo login migration error:', errorMessage, error)
-  }
-
-  const token = jwt.sign(
-    { userId: existingUser.id, email: existingUser.email },
-    env.jwtSecret,
-    { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
-  )
-
-  return res.status(200).json({
-    success: true,
-    message: 'Login successful',
-    token,
-    user: {
-      id: existingUser.id,
-      name: existingUser.name,
-      email: existingUser.email,
-    },
-  })
 })
 
 authRouter.post('/register', async (req, res) => {
@@ -251,68 +233,52 @@ authRouter.post('/register', async (req, res) => {
     confirmPassword?: string
   }
 
-  if (
-    !firstName ||
-    !lastName ||
-    !email ||
-    !phone ||
-    !city ||
-    !country ||
-    !password ||
-    !confirmPassword
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: 'All fields are required',
-    })
+  if (!firstName || !lastName || !email || !phone || !city || !country || !password || !confirmPassword) {
+    return res.status(400).json({ success: false, message: 'All fields are required' })
   }
 
   if (password !== confirmPassword) {
-    return res.status(400).json({
-      success: false,
-      message: 'Passwords do not match',
-    })
+    return res.status(400).json({ success: false, message: 'Passwords do not match' })
   }
 
+  const normalizedEmail = email.trim().toLowerCase()
+
   try {
-    await ensureUsersTable()
+    requireSupabase()
 
-    const normalizedEmail = email.trim().toLowerCase()
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail])
+    const { data: existingUser, error: existingError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
 
-    if (existingUser.rowCount && existingUser.rowCount > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'Email is already registered',
-      })
+    if (existingError) throw existingError
+    if (existingUser || findUserByEmail(normalizedEmail) || await findFileUser(normalizedEmail)) {
+      return res.status(409).json({ success: false, message: 'Email is already registered' })
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
+    const { data: newUser, error } = await supabase
+      .from('users')
+      .insert({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: normalizedEmail,
+        phone: phone.trim(),
+        city: city.trim(),
+        country: country.trim(),
+        password_hash: passwordHash,
+      })
+      .select('id, first_name, last_name, email, phone, city, country')
+      .single()
 
-    const insertResult = await pool.query(
-      `
-        INSERT INTO users (first_name, last_name, email, phone, city, country, password_hash)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, first_name, last_name, email, phone, city, country
-      `,
-      [
-        firstName.trim(),
-        lastName.trim(),
-        normalizedEmail,
-        phone.trim(),
-        city.trim(),
-        country.trim(),
-        passwordHash,
-      ],
-    )
-
-    const newUser = insertResult.rows[0]
+    if (error) throw error
 
     return res.status(201).json({
       success: true,
       message: 'Registration successful',
       user: {
-        id: newUser.id,
+        id: String(newUser.id),
         firstName: newUser.first_name,
         lastName: newUser.last_name,
         email: newUser.email,
@@ -323,25 +289,18 @@ authRouter.post('/register', async (req, res) => {
     })
   } catch (dbError) {
     const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
-    console.error('Database registration failed:', dbErrorMessage, 'Falling back to file-based storage...')
+    console.error('Supabase registration failed:', dbErrorMessage, 'Falling back to file-based storage...')
 
-    // Fallback to file-based storage when database is unavailable
     try {
       const registeredUsers = await loadRegisteredUsers()
-      const normalizedEmail = email.trim().toLowerCase()
 
-      // Check if email already exists
-      if (registeredUsers.some((u: any) => u.email === normalizedEmail)) {
-        return res.status(409).json({
-          success: false,
-          message: 'Email is already registered',
-        })
+      if (registeredUsers.some((user: any) => user.email === normalizedEmail)) {
+        return res.status(409).json({ success: false, message: 'Email is already registered' })
       }
 
       const passwordHash = await bcrypt.hash(password, 10)
-
       const newUser = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).slice(2, 11),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: normalizedEmail,
@@ -354,8 +313,6 @@ authRouter.post('/register', async (req, res) => {
 
       registeredUsers.push(newUser)
       await saveRegisteredUsers(registeredUsers)
-
-      console.log('User registered successfully using file-based storage (fallback mode)')
 
       return res.status(201).json({
         success: true,
@@ -373,11 +330,7 @@ authRouter.post('/register', async (req, res) => {
     } catch (fileError) {
       const fileErrorMessage = fileError instanceof Error ? fileError.message : String(fileError)
       console.error('File-based registration also failed:', fileErrorMessage)
-      return res.status(500).json({
-        success: false,
-        message: 'Registration failed due to server error',
-        error: fileErrorMessage,
-      })
+      return res.status(500).json({ success: false, message: 'Registration failed due to server error' })
     }
   }
 })

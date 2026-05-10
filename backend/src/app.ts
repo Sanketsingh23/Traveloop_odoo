@@ -39,11 +39,6 @@ app.get('/', (_req, res) => {
 
 app.use('/api/health', healthRouter)
 app.use('/api/auth', authRouter)
-app.use('/auth', authRouter)
-app.use('/trips', tripsRouter)
-app.use('/budget', budgetRouter)
-app.use('/checklist', checklistRouter)
-app.use('/users', usersRouter)
 app.use('/api/trips', tripsRouter)
 app.use('/api/budget', budgetRouter)
 app.use('/api/checklist', checklistRouter)

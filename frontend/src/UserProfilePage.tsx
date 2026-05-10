@@ -56,7 +56,7 @@ const UserProfilePage = () => {
       try {
         setLoading(true)
         setError('')
-        const response = await axios.get<ProfileResponse>('/users/profile', {
+        const response = await axios.get<ProfileResponse>('/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` },
         })
         const nextProfile = response.data.profile
@@ -127,7 +127,7 @@ const UserProfilePage = () => {
     try {
       setSavingProfile(true)
       setError('')
-      const response = await axios.put<ProfileResponse>('/users/profile', formData, { headers })
+      const response = await axios.put<ProfileResponse>('/api/users/profile', formData, { headers })
       const nextProfile = response.data.profile
       setProfile(nextProfile)
       setProfileImage(nextProfile.profileImage)
@@ -149,7 +149,7 @@ const UserProfilePage = () => {
     try {
       setSavingPassword(true)
       setError('')
-      await axios.put('/users/profile/password', { currentPassword, newPassword }, { headers })
+      await axios.put('/api/users/profile/password', { currentPassword, newPassword }, { headers })
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')

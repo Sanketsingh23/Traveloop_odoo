@@ -70,12 +70,12 @@ const CreateTripPage = () => {
 
     try {
       setSubmitting(true)
-      await axios.post('/trips', formData, {
+      const response = await axios.post<{ trip: { id: string } }>('/api/trips', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
-      window.location.href = '/itinerary-builder'
+      window.location.href = `/itinerary-builder/${response.data.trip.id}`
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>
       setErrorMessage(axiosError.response?.data?.message ?? 'Failed to create trip. Please try again.')

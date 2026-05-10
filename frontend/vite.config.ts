@@ -11,26 +11,6 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
-      '/auth': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/trips': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/users': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/budget': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/checklist': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
       '/uploads': {
         target: 'http://localhost:5000',
         changeOrigin: true,

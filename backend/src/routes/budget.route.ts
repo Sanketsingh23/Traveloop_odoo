@@ -1,132 +1,74 @@
 import { Router } from 'express'
 
-import { pool } from '../db/pool.js'
+import { supabase } from '../db/supabase.js'
 import { authenticate } from '../middleware/auth.js'
+import { resolveAuthenticatedUserId } from '../utils/auth-user.js'
 
 const budgetRouter = Router()
 
-const ensureBudgetTables = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS trips (
-      id SERIAL PRIMARY KEY,
-      user_id INT NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      destination VARCHAR(255) NOT NULL,
-      description TEXT,
-      start_date DATE NOT NULL,
-      end_date DATE NOT NULL,
-      cover_image VARCHAR(1024),
-      budget_limit NUMERIC(12,2) NOT NULL,
-      travel_type VARCHAR(100) NOT NULL,
-      status VARCHAR(50) NOT NULL,
-      destination_count INT NOT NULL DEFAULT 1,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS stops (
-      id SERIAL PRIMARY KEY,
-      trip_id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-      city VARCHAR(255) NOT NULL,
-      order_index INT NOT NULL,
-      start_date DATE NOT NULL,
-      end_date DATE,
-      notes TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS activities (
-      id SERIAL PRIMARY KEY,
-      stop_id INT NOT NULL REFERENCES stops(id) ON DELETE CASCADE,
-      title VARCHAR(255) NOT NULL,
-      description TEXT,
-      activity_date DATE NOT NULL,
-      start_time TIME,
-      end_time TIME,
-      cost NUMERIC(10,2),
-      order_index INT NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
-}
-
-const daysBetweenInclusive = (startDate: Date, endDate: Date) => {
-  const difference = endDate.getTime() - startDate.getTime()
+const daysBetweenInclusive = (startDate: string, endDate: string) => {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const difference = end.getTime() - start.getTime()
   return Math.max(1, Math.floor(difference / 86400000) + 1)
 }
 
 budgetRouter.get('/:tripId', authenticate, async (req, res) => {
-  const userId = Number(req.user?.userId)
+  const userId = await resolveAuthenticatedUserId(req)
+  if (!userId) return res.status(401).json({ success: false, message: 'Invalid user session' })
   const { tripId } = req.params
 
   try {
-    await ensureBudgetTables()
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select('id, title, start_date, end_date, budget_limit')
+      .eq('id', tripId)
+      .eq('user_id', userId)
+      .maybeSingle()
 
-    const tripResult = await pool.query(
-      `SELECT id, title, start_date, end_date, budget_limit
-       FROM trips
-       WHERE id = $1 AND user_id = $2`,
-      [tripId, userId],
-    )
+    if (tripError) throw tripError
+    if (!trip) return res.status(404).json({ success: false, message: 'Trip not found' })
 
-    if (tripResult.rowCount === 0) {
-      return res.status(404).json({ success: false, message: 'Trip not found' })
-    }
+    const { data: stops, error: stopsError } = await supabase
+      .from('stops')
+      .select('id, city')
+      .eq('trip_id', tripId)
 
-    const trip = tripResult.rows[0]
-    const activityResult = await pool.query(
-      `SELECT COALESCE(SUM(a.cost), 0) AS activity_cost
-       FROM activities a
-       INNER JOIN stops s ON s.id = a.stop_id
-       WHERE s.trip_id = $1`,
-      [tripId],
-    )
+    if (stopsError) throw stopsError
 
-    const dayResult = await pool.query(
-      `SELECT a.activity_date, COALESCE(SUM(a.cost), 0) AS activity_cost
-       FROM activities a
-       INNER JOIN stops s ON s.id = a.stop_id
-       WHERE s.trip_id = $1
-       GROUP BY a.activity_date
-       ORDER BY a.activity_date ASC`,
-      [tripId],
-    )
+    const stopIds = (stops ?? []).map((stop) => stop.id)
+    const { data: activities, error: activitiesError } = stopIds.length
+      ? await supabase
+          .from('activities')
+          .select('activity_date, cost, stop_id')
+          .in('stop_id', stopIds)
+          .order('activity_date', { ascending: true })
+      : { data: [], error: null }
 
-    const cityResult = await pool.query(
-      `SELECT s.city, COALESCE(SUM(a.cost), 0) AS activity_cost
-       FROM stops s
-       LEFT JOIN activities a ON a.stop_id = s.id
-       WHERE s.trip_id = $1
-       GROUP BY s.city
-       ORDER BY s.city ASC`,
-      [tripId],
-    )
+    if (activitiesError) throw activitiesError
 
     const totalDays = daysBetweenInclusive(trip.start_date, trip.end_date)
     const budgetLimit = Number(trip.budget_limit)
-    const activityCost = Number(activityResult.rows[0]?.activity_cost ?? 0)
+    const activityCost = (activities ?? []).reduce((sum, activity) => sum + Number(activity.cost ?? 0), 0)
     const hotelCost = Math.round(totalDays * 95)
     const foodCost = Math.round(totalDays * 42)
-    const transportCost = Math.round(Math.max(1, cityResult.rowCount || 1) * 55 + totalDays * 18)
+    const transportCost = Math.round(Math.max(1, stops?.length || 1) * 55 + totalDays * 18)
     const totalCost = activityCost + hotelCost + foodCost + transportCost
     const remaining = budgetLimit - totalCost
     const costPerDay = Math.round(totalCost / totalDays)
 
-    const categories = [
-      { name: 'Activities', value: activityCost },
-      { name: 'Hotel', value: hotelCost },
-      { name: 'Food', value: foodCost },
-      { name: 'Transport', value: transportCost },
-    ]
+    const dailyCostMap = new Map<string, number>()
+    for (const activity of activities ?? []) {
+      const date = String(activity.activity_date)
+      dailyCostMap.set(date, (dailyCostMap.get(date) ?? 0) + Number(activity.cost ?? 0))
+    }
 
-    const dailyCosts = dayResult.rows.map((row: any) => ({
-      date: row.activity_date.toISOString().slice(0, 10),
-      activities: Number(row.activity_cost),
-      total: Number(row.activity_cost) + Math.round(hotelCost / totalDays) + Math.round(foodCost / totalDays) + Math.round(transportCost / totalDays),
-    }))
+    const cityCostMap = new Map<string, number>()
+    for (const stop of stops ?? []) cityCostMap.set(stop.city, 0)
+    for (const activity of activities ?? []) {
+      const stop = (stops ?? []).find((item) => item.id === activity.stop_id)
+      if (stop) cityCostMap.set(stop.city, (cityCostMap.get(stop.city) ?? 0) + Number(activity.cost ?? 0))
+    }
 
     const alerts = []
     if (remaining < 0) {
@@ -151,11 +93,20 @@ budgetRouter.get('/:tripId', authenticate, async (req, res) => {
         hotelCost,
         foodCost,
         transportCost,
-        categories,
-        dailyCosts,
-        cityCosts: cityResult.rows.map((row: any) => ({
-          city: row.city,
-          activities: Number(row.activity_cost),
+        categories: [
+          { name: 'Activities', value: activityCost },
+          { name: 'Hotel', value: hotelCost },
+          { name: 'Food', value: foodCost },
+          { name: 'Transport', value: transportCost },
+        ],
+        dailyCosts: [...dailyCostMap.entries()].map(([date, activitiesTotal]) => ({
+          date,
+          activities: activitiesTotal,
+          total: activitiesTotal + Math.round(hotelCost / totalDays) + Math.round(foodCost / totalDays) + Math.round(transportCost / totalDays),
+        })),
+        cityCosts: [...cityCostMap.entries()].map(([city, activitiesTotal]) => ({
+          city,
+          activities: activitiesTotal,
         })),
         alerts,
       },

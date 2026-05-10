@@ -96,7 +96,7 @@ const ItineraryBudgetPage = ({ tripId: initialTripId }: { tripId?: string }) => 
 
     const fetchTrips = async () => {
       try {
-        const response = await axios.get<{ trips: TripOption[] }>('/trips', {
+        const response = await axios.get<{ trips: TripOption[] }>('/api/trips', {
           headers: { Authorization: `Bearer ${token}` },
         })
         setTrips(response.data.trips)
@@ -123,10 +123,10 @@ const ItineraryBudgetPage = ({ tripId: initialTripId }: { tripId?: string }) => 
         setLoading(true)
         setError('')
         const [summaryResponse, budgetResponse] = await Promise.all([
-          axios.get<{ trip: TripSummary; stops: Stop[] }>(`/trips/${tripId}/summary`, {
+          axios.get<{ trip: TripSummary; stops: Stop[] }>(`/api/trips/${tripId}/summary`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get<{ budget: Budget }>(`/budget/${tripId}`, {
+          axios.get<{ budget: Budget }>(`/api/budget/${tripId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ])

@@ -13,5 +13,6 @@ export const env = {
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   jwtSecret: process.env.JWT_SECRET ?? 'travelloop-dev-secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
-  databaseUrl: process.env.DATABASE_URL ?? '',
+  supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '',
+  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '',
 }

@@ -145,7 +145,7 @@ const AddStopModal = ({
     try {
       setLoading(true)
       const response = await axios.post(
-        `/trips/${tripId}/stops`,
+        `/api/trips/${tripId}/stops`,
         {
           city: city.trim(),
           startDate,
@@ -253,7 +253,7 @@ const AddActivityModal = ({
     try {
       setLoading(true)
       const response = await axios.post(
-        `/trips/${tripId}/stops/${stopId}/activities`,
+        `/api/trips/${tripId}/stops/${stopId}/activities`,
         {
           title: title.trim(),
           description: description.trim() || null,
@@ -372,8 +372,8 @@ const ItineraryBuilderPage = ({ tripId }: { tripId: string }) => {
     const fetchData = async () => {
       try {
         const [tripRes, itineraryRes] = await Promise.all([
-          axios.get(`/trips/${tripId}`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`/trips/${tripId}/itinerary`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`/api/trips/${tripId}`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`/api/trips/${tripId}/itinerary`, { headers: { Authorization: `Bearer ${token}` } }),
         ])
         setTrip(tripRes.data.trip)
         setStops(itineraryRes.data.stops)
@@ -409,7 +409,7 @@ const ItineraryBuilderPage = ({ tripId }: { tripId: string }) => {
   const handleDeleteActivity = async (activityId: string) => {
     if (!token) return
     try {
-      await axios.delete(`/trips/${tripId}/activities/${activityId}`, {
+      await axios.delete(`/api/trips/${tripId}/activities/${activityId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       setStops((prev) =>

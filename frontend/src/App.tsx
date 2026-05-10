@@ -10,7 +10,6 @@ import ActivitySearchPage from './ActivitySearchPage.tsx'
 import ItineraryBudgetPage from './ItineraryBudgetPage.tsx'
 import PackingChecklistPage from './PackingChecklistPage.tsx'
 import UserProfilePage from './UserProfilePage.tsx'
-import { supabase } from "./lib/supabase";
 
 
 type LoginResponse = {
@@ -113,7 +112,10 @@ const LoginPage = () => {
       window.location.href = '/dashboard'
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>
-      setErrorMessage(axiosError.response?.data?.message ?? 'Login failed. Please try again.')
+      setErrorMessage(
+        axiosError.response?.data?.message ??
+        (axiosError.request ? 'Backend is not reachable. Start the backend server and try again.' : 'Login failed. Please try again.'),
+      )
     } finally {
       setLoading(false)
     }
@@ -229,7 +231,7 @@ const RegisterPage = () => {
 
     try {
       setLoading(true)
-      const response = await axios.post<RegisterResponse>('/auth/register', {
+      const response = await axios.post<RegisterResponse>('/api/auth/register', {
         firstName,
         lastName,
         email,
@@ -251,7 +253,10 @@ const RegisterPage = () => {
       setConfirmPassword('')
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>
-      setErrorMessage(axiosError.response?.data?.message ?? 'Registration failed. Please try again.')
+      setErrorMessage(
+        axiosError.response?.data?.message ??
+        (axiosError.request ? 'Backend is not reachable. Start the backend server and try again.' : 'Registration failed. Please try again.'),
+      )
     } finally {
       setLoading(false)
     }
@@ -323,8 +328,8 @@ const DashboardPage = () => {
       try {
         setLoading(true)
         const [tripsResponse, statsResponse] = await Promise.all([
-          axios.get<{ trips: Trip[]; recommendedDestinations: Destination[] }>('/trips/recent', { headers }),
-          axios.get<{ stats: DashboardStats; reminders: Reminder[] }>('/users/dashboard-stats', { headers }),
+          axios.get<{ trips: Trip[]; recommendedDestinations: Destination[] }>('/api/trips/recent', { headers }),
+          axios.get<{ stats: DashboardStats; reminders: Reminder[] }>('/api/users/dashboard-stats', { headers }),
         ])
 
         setTrips(tripsResponse.data.trips)
