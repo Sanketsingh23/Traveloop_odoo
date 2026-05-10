@@ -5,7 +5,7 @@ import type { SignOptions } from 'jsonwebtoken'
 
 import { pool } from '../db/pool.js'
 import { env } from '../config/env.js'
-import { findUserByEmail } from '../data/users.js'
+import { addUser, findUserByEmail } from '../data/users.js'
 
 const authRouter = Router()
 
@@ -38,47 +38,45 @@ authRouter.post('/login', async (req, res) => {
   const normalizedEmail = email.trim().toLowerCase()
 
   try {
-    await ensureUsersTable()
-    const userResult = await pool.query(
-      `SELECT id, first_name, last_name, email, password_hash
-       FROM users
-       WHERE email = $1`,
-      [normalizedEmail],
-    )
-
-    if (userResult.rowCount && userResult.rowCount > 0) {
-      const dbUser = userResult.rows[0]
-      const isPasswordValid = await bcrypt.compare(password, dbUser.password_hash)
-      if (!isPasswordValid) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid credentials',
-        })
-      }
-
-      const token = jwt.sign(
-        { userId: String(dbUser.id), email: dbUser.email },
-        env.jwtSecret,
-        { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
+    if (env.databaseUrl) {
+      await ensureUsersTable()
+      const userResult = await pool.query(
+        `SELECT id, first_name, last_name, email, password_hash
+         FROM users
+         WHERE email = $1`,
+        [normalizedEmail],
       )
 
-      return res.status(200).json({
-        success: true,
-        message: 'Login successful',
-        token,
-        user: {
-          id: String(dbUser.id),
-          name: `${dbUser.first_name} ${dbUser.last_name}`.trim(),
-          email: dbUser.email,
-        },
-      })
+      if (userResult.rowCount && userResult.rowCount > 0) {
+        const dbUser = userResult.rows[0]
+        const isPasswordValid = await bcrypt.compare(password, dbUser.password_hash)
+        if (!isPasswordValid) {
+          return res.status(401).json({
+            success: false,
+            message: 'Invalid credentials',
+          })
+        }
+
+        const token = jwt.sign(
+          { userId: String(dbUser.id), email: dbUser.email },
+          env.jwtSecret,
+          { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
+        )
+
+        return res.status(200).json({
+          success: true,
+          message: 'Login successful',
+          token,
+          user: {
+            id: String(dbUser.id),
+            name: `${dbUser.first_name} ${dbUser.last_name}`.trim(),
+            email: dbUser.email,
+          },
+        })
+      }
     }
   } catch (error) {
     console.error('Login lookup error', error)
-    return res.status(500).json({
-      success: false,
-      message: 'Login failed due to server error',
-    })
   }
 
   const existingUser = findUserByEmail(normalizedEmail)
@@ -98,41 +96,43 @@ authRouter.post('/login', async (req, res) => {
   }
 
   try {
-    await ensureUsersTable()
-    const [firstName, ...lastNameParts] = existingUser.name.split(' ')
-    const insertResult = await pool.query(
-      `INSERT INTO users (first_name, last_name, email, phone, city, country, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
-       RETURNING id, first_name, last_name, email`,
-      [
-        firstName || 'TravelLoop',
-        lastNameParts.join(' ') || 'Demo',
-        existingUser.email.toLowerCase(),
-        '0000000000',
-        'Demo City',
-        'Demo Country',
-        existingUser.passwordHash,
-      ],
-    )
+    if (env.databaseUrl) {
+      await ensureUsersTable()
+      const [firstName, ...lastNameParts] = existingUser.name.split(' ')
+      const insertResult = await pool.query(
+        `INSERT INTO users (first_name, last_name, email, phone, city, country, password_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+         RETURNING id, first_name, last_name, email`,
+        [
+          firstName || 'TravelLoop',
+          lastNameParts.join(' ') || 'Demo',
+          existingUser.email.toLowerCase(),
+          '0000000000',
+          'Demo City',
+          'Demo Country',
+          existingUser.passwordHash,
+        ],
+      )
 
-    const demoUser = insertResult.rows[0]
-    const token = jwt.sign(
-      { userId: String(demoUser.id), email: demoUser.email },
-      env.jwtSecret,
-      { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
-    )
+      const demoUser = insertResult.rows[0]
+      const token = jwt.sign(
+        { userId: String(demoUser.id), email: demoUser.email },
+        env.jwtSecret,
+        { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
+      )
 
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      token,
-      user: {
-        id: String(demoUser.id),
-        name: `${demoUser.first_name} ${demoUser.last_name}`.trim(),
-        email: demoUser.email,
-      },
-    })
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        token,
+        user: {
+          id: String(demoUser.id),
+          name: `${demoUser.first_name} ${demoUser.last_name}`.trim(),
+          email: demoUser.email,
+        },
+      })
+    }
   } catch (error) {
     console.error('Demo login migration error', error)
   }
@@ -199,10 +199,44 @@ authRouter.post('/register', async (req, res) => {
     })
   }
 
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!env.databaseUrl) {
+    if (findUserByEmail(normalizedEmail)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email is already registered',
+      })
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const userId = `local_${Date.now()}`
+
+    addUser({
+      id: userId,
+      name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      email: normalizedEmail,
+      passwordHash,
+    })
+
+    return res.status(201).json({
+      success: true,
+      message: 'Registration successful',
+      user: {
+        id: userId,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: normalizedEmail,
+        phone: phone.trim(),
+        city: city.trim(),
+        country: country.trim(),
+      },
+    })
+  }
+
   try {
     await ensureUsersTable()
 
-    const normalizedEmail = email.trim().toLowerCase()
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [normalizedEmail])
 
     if (existingUser.rowCount && existingUser.rowCount > 0) {

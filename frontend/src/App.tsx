@@ -10,6 +10,7 @@ import ActivitySearchPage from './ActivitySearchPage.tsx'
 import ItineraryBudgetPage from './ItineraryBudgetPage.tsx'
 import PackingChecklistPage from './PackingChecklistPage.tsx'
 import UserProfilePage from './UserProfilePage.tsx'
+import './App.css'
 
 type LoginResponse = {
   token: string
@@ -51,23 +52,31 @@ type Destination = {
 }
 
 const AuthLayout = ({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) => (
-  <main className="min-h-screen bg-[radial-gradient(circle_at_20%_10%,#c1f2ff_0%,transparent_45%),radial-gradient(circle_at_90%_20%,#d6ffd5_0%,transparent_40%),linear-gradient(145deg,#f7fbff,#eef8ff)] px-4 py-10">
-    <section className="mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 md:grid-cols-2">
-      <div className="hidden bg-linear-to-br from-cyan-700 via-blue-700 to-cyan-900 p-10 text-cyan-50 md:block">
-        <div className="mb-12 flex items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-xl bg-cyan-300/20 text-2xl font-bold">T</span>
+  <main className="auth-page">
+    <section className="auth-shell">
+      <aside className="auth-visual" aria-label="TravelLoop">
+        <div className="brand-lockup">
+          <span className="brand-mark">T</span>
           <div>
-            <p className="text-xl font-semibold tracking-wide">TravelLoop</p>
-            <p className="text-sm text-cyan-100/80">Plan. Loop. Go.</p>
+            <p className="brand-name">TravelLoop</p>
+            <p className="brand-tagline">Plan. Loop. Go.</p>
           </div>
         </div>
-        <h1 className="max-w-sm text-4xl font-bold leading-tight">{title}</h1>
-        <p className="mt-5 max-w-sm text-cyan-100/90">{subtitle}</p>
-      </div>
-      <div className="p-6 sm:p-10">
-        <div className="mb-8 flex items-center gap-3 md:hidden">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-cyan-700 text-lg font-bold text-cyan-50">T</span>
-          <p className="text-lg font-semibold text-slate-900">TravelLoop</p>
+        <div className="auth-copy">
+          <p className="auth-kicker">Smart travel workspace</p>
+          <h1>{title}</h1>
+          <p>{subtitle}</p>
+        </div>
+        <div className="auth-metrics" aria-label="TravelLoop highlights">
+          <span>Trips</span>
+          <span>Budgets</span>
+          <span>Itinerary</span>
+        </div>
+      </aside>
+      <div className="auth-panel">
+        <div className="mobile-brand">
+          <span className="brand-mark">T</span>
+          <p className="brand-name">TravelLoop</p>
         </div>
         {children}
       </div>
@@ -122,57 +131,57 @@ const LoginPage = () => {
       title="Sign in to continue your journey."
       subtitle="Access your itineraries, saved destinations, and personalized travel insights."
     >
-      <h2 className="text-2xl font-bold text-slate-900">Login</h2>
-      <p className="mt-1 text-sm text-slate-600">Authenticate your account to continue.</p>
+      <h2 className="auth-title">Welcome back</h2>
+      <p className="auth-subtitle">Login to continue planning your next route.</p>
 
-      <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
-        <div>
-          <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">Email</label>
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <div className="field-group">
+          <label htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200"
+            className="form-control"
             placeholder="you@example.com"
             autoComplete="email"
           />
-          {email && emailError && <p className="mt-2 text-xs text-rose-600">{emailError}</p>}
+          {email && emailError && <p className="field-error">{emailError}</p>}
         </div>
 
-        <div>
-          <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">Password</label>
-          <div className="relative">
+        <div className="field-group">
+          <label htmlFor="password">Password</label>
+          <div className="password-field">
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-24 text-slate-900 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200"
+              className="form-control"
               autoComplete="current-password"
             />
             <button
               type="button"
               onClick={() => setShowPassword((value) => !value)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-200"
+              className="ghost-toggle"
             >
               {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
-          {password && passwordError && <p className="mt-2 text-xs text-rose-600">{passwordError}</p>}
+          {password && passwordError && <p className="field-error">{passwordError}</p>}
         </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <a href="/forgot-password" className="font-medium text-cyan-700 hover:text-cyan-800">Forgot password?</a>
-          <a href="/register" className="font-medium text-slate-700 hover:text-slate-900">Register</a>
+        <div className="form-links">
+          <a href="/forgot-password">Forgot password?</a>
+          <a href="/register">Create account</a>
         </div>
 
-        {errorMessage && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>}
+        {errorMessage && <p className="alert alert-error">{errorMessage}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-cyan-500"
+          className="primary-action"
         >
           {loading ? 'Logging in...' : 'Login'}
         </button>
@@ -260,40 +269,40 @@ const RegisterPage = () => {
       title="Create your TravelLoop account."
       subtitle="Sign up to manage trips, save destinations, and personalize your travel profile."
     >
-      <h2 className="text-2xl font-bold text-slate-900">Register</h2>
-      <p className="mt-1 text-sm text-slate-600">Create your new account.</p>
+      <h2 className="auth-title">Create account</h2>
+      <p className="auth-subtitle">Save your trips, budgets, and checklist in one place.</p>
 
-      <form className="mt-8 grid gap-4" onSubmit={handleSubmit} noValidate>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="First name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Last name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
+      <form className="auth-form compact" onSubmit={handleSubmit} noValidate>
+        <div className="form-grid">
+          <input className="form-control" placeholder="First name" value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+          <input className="form-control" placeholder="Last name" value={lastName} onChange={(event) => setLastName(event.target.value)} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="form-grid">
           <div>
-            <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
-            {email && emailError && <p className="mt-2 text-xs text-rose-600">{emailError}</p>}
+            <input className="form-control" placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            {email && emailError && <p className="field-error">{emailError}</p>}
           </div>
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input className="form-control" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="City" value={city} onChange={(event) => setCity(event.target.value)} />
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
+        <div className="form-grid">
+          <input className="form-control" placeholder="City" value={city} onChange={(event) => setCity(event.target.value)} />
+          <input className="form-control" placeholder="Country" value={country} onChange={(event) => setCountry(event.target.value)} />
         </div>
-        <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <input className="form-control" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
         <div>
-          <input className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Confirm password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
-          {confirmPassword && !passwordsMatch && <p className="mt-2 text-xs text-rose-600">Passwords do not match</p>}
+          <input className="form-control" placeholder="Confirm password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+          {confirmPassword && !passwordsMatch && <p className="field-error">Passwords do not match</p>}
         </div>
 
-        {errorMessage && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>}
-        {successMessage && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p>}
+        {errorMessage && <p className="alert alert-error">{errorMessage}</p>}
+        {successMessage && <p className="alert alert-success">{successMessage}</p>}
 
-        <button type="submit" disabled={loading} className="w-full rounded-xl bg-cyan-700 px-4 py-3 font-semibold text-white transition hover:bg-cyan-800 disabled:bg-cyan-500">
+        <button type="submit" disabled={loading} className="primary-action">
           {loading ? 'Creating account...' : 'Create account'}
         </button>
 
-        <p className="text-center text-sm text-slate-600">
-          Already have an account? <a href="/" className="font-semibold text-cyan-700">Login</a>
+        <p className="switch-auth">
+          Already have an account? <a href="/">Login</a>
         </p>
       </form>
     </AuthLayout>
@@ -347,40 +356,47 @@ const DashboardPage = () => {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <nav className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-700 font-bold text-white">T</span>
-            <span className="text-lg font-bold text-slate-900">TravelLoop</span>
+    <main className="dashboard-page">
+      <nav className="app-nav">
+        <div className="nav-inner">
+          <div className="nav-brand">
+            <span className="brand-mark">T</span>
+            <span>TravelLoop</span>
           </div>
-          <div className="flex items-center gap-5 text-sm font-medium text-slate-700">
-            <a href="/dashboard" className="text-cyan-700">Dashboard</a>
-            <a href="/trips" className="hover:text-cyan-700">My Trips</a>
-            <a href="/city-search" className="hover:text-cyan-700">Explore</a>
-            <a href="/activity-search" className="hover:text-cyan-700">Activities</a>
-            <a href="/itinerary-budget" className="hover:text-cyan-700">Budget</a>
-            <a href="/packing-checklist" className="hover:text-cyan-700">Checklist</a>
-            <a href="/profile" className="hover:text-cyan-700">Profile</a>
-            <button type="button" onClick={logout} className="rounded-lg bg-rose-50 px-3 py-1.5 text-rose-700 hover:bg-rose-100">Logout</button>
+          <div className="nav-links">
+            <a href="/dashboard" className="active">Dashboard</a>
+            <a href="/trips">My Trips</a>
+            <a href="/city-search">Explore</a>
+            <a href="/activity-search">Activities</a>
+            <a href="/itinerary-budget">Budget</a>
+            <a href="/packing-checklist">Checklist</a>
+            <a href="/profile">Profile</a>
+            <button type="button" onClick={logout} className="logout-btn">Logout</button>
           </div>
         </div>
       </nav>
 
-      <section className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-6 rounded-2xl bg-linear-to-r from-cyan-700 via-blue-700 to-indigo-700 p-6 text-white">
-          <h1 className="text-3xl font-bold">Welcome to your Dashboard</h1>
-          <p className="mt-2 text-cyan-50/90">Quick access to trips, budget insights, and travel reminders.</p>
+      <section className="dashboard-shell">
+        <div className="dashboard-hero">
+          <div>
+            <p className="dashboard-kicker">Your travel command center</p>
+            <h1>Welcome to your Dashboard</h1>
+            <p>Quick access to trips, budget insights, destinations, and reminders.</p>
+          </div>
+          <a href="/trips/create" className="hero-action">Plan trip</a>
         </div>
 
-        {loading && <p className="rounded-xl bg-white p-4 text-slate-700 shadow">Loading dashboard...</p>}
-        {errorMessage && <p className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{errorMessage}</p>}
+        {loading && <p className="surface-message">Loading dashboard...</p>}
+        {errorMessage && <p className="alert alert-error">{errorMessage}</p>}
 
         {!loading && !errorMessage && (
-          <div className="grid gap-6">
-            <section>
-              <h2 className="mb-3 text-xl font-semibold text-slate-900">Budget Summary</h2>
-              <div className="grid gap-4 md:grid-cols-5">
+          <div className="dashboard-grid">
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h2>Budget Summary</h2>
+                <span>Live overview</span>
+              </div>
+              <div className="stats-grid">
                 <StatCard label="Total Trips" value={stats?.totalTrips ?? 0} />
                 <StatCard label="Upcoming" value={stats?.upcomingTrips ?? 0} />
                 <StatCard label="Budget" value={`$${stats?.totalBudget ?? 0}`} />
@@ -389,40 +405,54 @@ const DashboardPage = () => {
               </div>
             </section>
 
-            <section>
-              <h2 className="mb-3 text-xl font-semibold text-slate-900">Recommended Destinations</h2>
-              <div className="grid gap-4 md:grid-cols-3">
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h2>Recommended Destinations</h2>
+                <span>Picked for you</span>
+              </div>
+              <div className="content-grid">
                 {recommended.map((item) => (
-                  <article key={item.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-lg font-semibold text-slate-900">{item.name}</p>
-                    <p className="text-sm text-slate-600">{item.country}</p>
+                  <article key={item.id} className="destination-card">
+                    <span className="card-marker">{item.name.slice(0, 1)}</span>
+                    <div>
+                      <p>{item.name}</p>
+                      <span>{item.country}</span>
+                    </div>
                   </article>
                 ))}
               </div>
             </section>
 
-            <section>
-              <h2 className="mb-3 text-xl font-semibold text-slate-900">Recent Trips</h2>
-              <div className="grid gap-4 md:grid-cols-3">
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h2>Recent Trips</h2>
+                <span>Continue planning</span>
+              </div>
+              <div className="content-grid">
                 {trips.map((trip) => (
-                  <article key={trip.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p className="text-lg font-semibold text-slate-900">{trip.destination}</p>
-                    <p className="mt-1 text-sm text-slate-600">{trip.startDate} to {trip.endDate}</p>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-cyan-700">{trip.status}</p>
-                    <p className="mt-2 text-sm text-slate-700">Budget: ${trip.budget}</p>
+                  <article key={trip.id} className="trip-card">
+                    <div className="trip-card-top">
+                      <p>{trip.destination}</p>
+                      <span>{trip.status}</span>
+                    </div>
+                    <p className="trip-dates">{trip.startDate} to {trip.endDate}</p>
+                    <p className="trip-budget">Budget: ${trip.budget}</p>
                   </article>
                 ))}
               </div>
             </section>
 
-            <section>
-              <h2 className="mb-3 text-xl font-semibold text-slate-900">Upcoming Trip Reminders</h2>
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <ul className="space-y-3">
+            <section className="dashboard-section">
+              <div className="section-heading">
+                <h2>Upcoming Trip Reminders</h2>
+                <span>Do not miss</span>
+              </div>
+              <div className="reminder-panel">
+                <ul>
                   {reminders.map((reminder) => (
-                    <li key={reminder.id} className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
-                      <span className="text-slate-700">{reminder.title}</span>
-                      <span className="text-sm font-medium text-cyan-700">{reminder.date}</span>
+                    <li key={reminder.id}>
+                      <span>{reminder.title}</span>
+                      <strong>{reminder.date}</strong>
                     </li>
                   ))}
                 </ul>
@@ -436,9 +466,9 @@ const DashboardPage = () => {
 }
 
 const StatCard = ({ label, value }: { label: string; value: string | number }) => (
-  <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-    <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-    <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+  <article className="stat-card">
+    <p>{label}</p>
+    <strong>{value}</strong>
   </article>
 )
 

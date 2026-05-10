@@ -21,3 +21,10 @@ const users: UserRecord[] = [
 export const findUserByEmail = (email: string) => {
   return users.find((user) => user.email.toLowerCase() === email.toLowerCase())
 }
+
+export const addUser = (user: UserRecord) => {
+  users.push({
+    ...user,
+    email: user.email.toLowerCase(),
+  })
+}
