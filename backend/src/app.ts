@@ -14,6 +14,7 @@ import { healthRouter } from './routes/health.route.js'
 import { tripsRouter } from './routes/trips.route.js'
 import { usersRouter } from './routes/users.route.js'
 
+
 const app = express()
 const uploadsDir = path.join(process.cwd(), 'uploads')
 fs.mkdirSync(uploadsDir, { recursive: true })

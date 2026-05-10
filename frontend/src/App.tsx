@@ -10,6 +10,8 @@ import ActivitySearchPage from './ActivitySearchPage.tsx'
 import ItineraryBudgetPage from './ItineraryBudgetPage.tsx'
 import PackingChecklistPage from './PackingChecklistPage.tsx'
 import UserProfilePage from './UserProfilePage.tsx'
+import { supabase } from "./lib/supabase";
+
 
 type LoginResponse = {
   token: string

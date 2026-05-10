@@ -26,5 +26,8 @@
   "homepage": "https://github.com/Sanketsingh23/Traveloop_odoo#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4"
   }
 }

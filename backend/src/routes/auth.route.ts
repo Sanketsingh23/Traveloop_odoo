@@ -2,27 +2,55 @@ import bcrypt from 'bcrypt'
 import { Router } from 'express'
 import jwt from 'jsonwebtoken'
 import type { SignOptions } from 'jsonwebtoken'
+import fs from 'fs/promises'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 import { pool } from '../db/pool.js'
 import { env } from '../config/env.js'
 import { findUserByEmail } from '../data/users.js'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const usersFilePath = path.join(__dirname, '../data/registered-users.json')
+
 const authRouter = Router()
 
+// Load users from file
+const loadRegisteredUsers = async () => {
+  try {
+    const data = await fs.readFile(usersFilePath, 'utf-8')
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
+}
+
+// Save users to file
+const saveRegisteredUsers = async (users: any[]) => {
+  await fs.writeFile(usersFilePath, JSON.stringify(users, null, 2))
+}
+
 const ensureUsersTable = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      first_name VARCHAR(100) NOT NULL,
-      last_name VARCHAR(100) NOT NULL,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      phone VARCHAR(30) NOT NULL,
-      city VARCHAR(100) NOT NULL,
-      country VARCHAR(100) NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT NOW()
-    )
-  `)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        phone VARCHAR(30) NOT NULL,
+        city VARCHAR(100) NOT NULL,
+        country VARCHAR(100) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Error creating users table:', errorMessage)
+    throw error
+  }
 }
 
 authRouter.post('/login', async (req, res) => {
@@ -73,14 +101,60 @@ authRouter.post('/login', async (req, res) => {
         },
       })
     }
-  } catch (error) {
-    console.error('Login lookup error', error)
-    return res.status(500).json({
-      success: false,
-      message: 'Login failed due to server error',
-    })
+  } catch (dbError) {
+    const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+    console.error('Database login failed:', dbErrorMessage, 'Falling back to file-based storage...')
+
+    // Fallback to file-based storage
+    try {
+      const registeredUsers = await loadRegisteredUsers()
+      const user = registeredUsers.find((u: any) => u.email === normalizedEmail)
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Email is not registered',
+        })
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash)
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials',
+        })
+      }
+
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        env.jwtSecret,
+        { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] },
+      )
+
+      console.log('User logged in successfully using file-based storage (fallback mode)')
+
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        token,
+        user: {
+          id: user.id,
+          name: `${user.firstName} ${user.lastName}`.trim(),
+          email: user.email,
+        },
+      })
+    } catch (fileError) {
+      const fileErrorMessage = fileError instanceof Error ? fileError.message : String(fileError)
+      console.error('File-based login also failed:', fileErrorMessage)
+      return res.status(500).json({
+        success: false,
+        message: 'Login failed due to server error',
+        error: fileErrorMessage,
+      })
+    }
   }
 
+  // Fallback to demo users if both database and file storage fail
   const existingUser = findUserByEmail(normalizedEmail)
   if (!existingUser) {
     return res.status(404).json({
@@ -134,7 +208,8 @@ authRouter.post('/login', async (req, res) => {
       },
     })
   } catch (error) {
-    console.error('Demo login migration error', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Demo login migration error:', errorMessage, error)
   }
 
   const token = jwt.sign(
@@ -246,12 +321,64 @@ authRouter.post('/register', async (req, res) => {
         country: newUser.country,
       },
     })
-  } catch (error) {
-    console.error('Registration error', error)
-    return res.status(500).json({
-      success: false,
-      message: 'Registration failed due to server error',
-    })
+  } catch (dbError) {
+    const dbErrorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+    console.error('Database registration failed:', dbErrorMessage, 'Falling back to file-based storage...')
+
+    // Fallback to file-based storage when database is unavailable
+    try {
+      const registeredUsers = await loadRegisteredUsers()
+      const normalizedEmail = email.trim().toLowerCase()
+
+      // Check if email already exists
+      if (registeredUsers.some((u: any) => u.email === normalizedEmail)) {
+        return res.status(409).json({
+          success: false,
+          message: 'Email is already registered',
+        })
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10)
+
+      const newUser = {
+        id: Math.random().toString(36).substr(2, 9),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: normalizedEmail,
+        phone: phone.trim(),
+        city: city.trim(),
+        country: country.trim(),
+        passwordHash,
+        createdAt: new Date().toISOString(),
+      }
+
+      registeredUsers.push(newUser)
+      await saveRegisteredUsers(registeredUsers)
+
+      console.log('User registered successfully using file-based storage (fallback mode)')
+
+      return res.status(201).json({
+        success: true,
+        message: 'Registration successful',
+        user: {
+          id: newUser.id,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          email: newUser.email,
+          phone: newUser.phone,
+          city: newUser.city,
+          country: newUser.country,
+        },
+      })
+    } catch (fileError) {
+      const fileErrorMessage = fileError instanceof Error ? fileError.message : String(fileError)
+      console.error('File-based registration also failed:', fileErrorMessage)
+      return res.status(500).json({
+        success: false,
+        message: 'Registration failed due to server error',
+        error: fileErrorMessage,
+      })
+    }
   }
 })
 

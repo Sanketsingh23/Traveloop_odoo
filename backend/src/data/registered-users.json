@@ -1,0 +1,35 @@
+[
+  {
+    "id": "pvqxxlrfy",
+    "firstName": "Shrutika",
+    "lastName": "Tayade",
+    "email": "shrutika@example.com",
+    "phone": "9876543210",
+    "city": "Mumbai",
+    "country": "India",
+    "passwordHash": "$2b$10$w0dzRdy/TqeKp//qndQdneVF/m6p.1qllMXt.wbWjDw1D833N0trK",
+    "createdAt": "2026-05-10T08:45:44.046Z"
+  },
+  {
+    "id": "z7d72lrsn",
+    "firstName": "John",
+    "lastName": "Smith",
+    "email": "john.smith@example.com",
+    "phone": "9876543210",
+    "city": "New York",
+    "country": "USA",
+    "passwordHash": "$2b$10$3WWbjl4hw1tbvPKmjJLDWe/DeXOiQro1pWzdBwPelqhLggXgmpBou",
+    "createdAt": "2026-05-10T08:47:08.245Z"
+  },
+  {
+    "id": "xqspu8lec",
+    "firstName": "Shrutika",
+    "lastName": "Tayade",
+    "email": "shrutikatayade13@gmail.com",
+    "phone": "1234567890",
+    "city": "Amravati",
+    "country": "India",
+    "passwordHash": "$2b$10$luvHwcdk4hYelN/QDPn9UuHxE8grjucI4hhAA3EVhpwZAx5WMW8wK",
+    "createdAt": "2026-05-10T08:49:00.138Z"
+  }
+]

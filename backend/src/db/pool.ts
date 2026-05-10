@@ -9,3 +9,11 @@ if (!env.databaseUrl) {
 export const pool = new Pool({
   connectionString: env.databaseUrl || undefined,
 })
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err)
+})
+
+pool.on('connect', () => {
+  console.log('Database connected successfully')
+})
