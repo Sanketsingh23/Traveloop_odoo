@@ -1,0 +1,30 @@
+{
+  "name": "travelloop",
+  "version": "1.0.0",
+  "description": "TravelLoop full-stack monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sanketsingh23/Traveloop_odoo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sanketsingh23/Traveloop_odoo/issues"
+  },
+  "homepage": "https://github.com/Sanketsingh23/Traveloop_odoo#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
