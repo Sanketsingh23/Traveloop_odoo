@@ -48,7 +48,7 @@ const UserProfilePage = () => {
 
   useEffect(() => {
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -312,3 +312,4 @@ const UserProfilePage = () => {
 }
 
 export default UserProfilePage
+

@@ -44,10 +44,16 @@ const TripsPage = () => {
   const [errorMessage, setErrorMessage] = useState('')
   const [actionMessage, setActionMessage] = useState('')
 
+  const handleSessionExpired = () => {
+    localStorage.removeItem('travelloop_token')
+    localStorage.removeItem('travelloop_user')
+    window.location.href = '/'
+  }
+
   useEffect(() => {
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -60,6 +66,10 @@ const TripsPage = () => {
         setTrips(response.data.trips)
       } catch (error) {
         const axiosError = error as AxiosError<{ message?: string }>
+        if (axiosError.response?.status === 401) {
+          handleSessionExpired()
+          return
+        }
         setErrorMessage(axiosError.response?.data?.message ?? 'Failed to load trips')
       } finally {
         setLoading(false)
@@ -94,7 +104,7 @@ const TripsPage = () => {
   const deleteTrip = async (id: string) => {
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -110,6 +120,10 @@ const TripsPage = () => {
       window.setTimeout(() => setActionMessage(''), 3000)
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>
+      if (axiosError.response?.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setErrorMessage(axiosError.response?.data?.message ?? 'Failed to delete trip')
     }
   }
@@ -301,3 +315,4 @@ const TripsPage = () => {
 }
 
 export default TripsPage
+

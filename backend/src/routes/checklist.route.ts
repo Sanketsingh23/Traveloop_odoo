@@ -14,6 +14,14 @@ const mapRowToChecklistItem = (row: any) => ({
   createdAt: row.created_at,
 })
 
+const mapMemoryItemToResponse = (item: any) => ({
+  id: item.id,
+  title: item.title,
+  category: item.category,
+  packed: item.packed,
+  createdAt: item.createdAt,
+})
+
 checklistRouter.get('/', authenticate, async (req, res) => {
   const userId = await resolveAuthenticatedUserId(req)
   if (!userId) return res.status(401).json({ success: false, message: 'Invalid user session' })

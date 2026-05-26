@@ -35,9 +35,15 @@ const PackingChecklistPage = () => {
   const token = localStorage.getItem('travelloop_token')
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined
 
+  const handleSessionExpired = () => {
+    localStorage.removeItem('travelloop_token')
+    localStorage.removeItem('travelloop_user')
+    window.location.href = '/'
+  }
+
   useEffect(() => {
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -49,6 +55,10 @@ const PackingChecklistPage = () => {
         setItems(response.data.items)
       } catch (err) {
         const axiosError = err as AxiosError<{ message?: string }>
+        if (axiosError.response?.status === 401) {
+          handleSessionExpired()
+          return
+        }
         setError(axiosError.response?.data?.message ?? 'Failed to load checklist')
       } finally {
         setLoading(false)
@@ -84,6 +94,10 @@ const PackingChecklistPage = () => {
       showMessage('Item added.')
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
+      if (axiosError.response?.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setError(axiosError.response?.data?.message ?? 'Failed to add item')
     } finally {
       setSaving(false)
@@ -98,6 +112,10 @@ const PackingChecklistPage = () => {
       setItems((current) => current.map((currentItem) => currentItem.id === item.id ? response.data.item : currentItem))
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
+      if (axiosError.response?.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setError(axiosError.response?.data?.message ?? 'Failed to update item')
     }
   }
@@ -111,6 +129,10 @@ const PackingChecklistPage = () => {
       showMessage('Item removed.')
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
+      if (axiosError.response?.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setError(axiosError.response?.data?.message ?? 'Failed to remove item')
     }
   }
@@ -128,6 +150,10 @@ const PackingChecklistPage = () => {
       showMessage('Checklist reset.')
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
+      if (axiosError.response?.status === 401) {
+        handleSessionExpired()
+        return
+      }
       setError(axiosError.response?.data?.message ?? 'Failed to reset checklist')
     } finally {
       setSaving(false)
@@ -283,3 +309,4 @@ const PackingChecklistPage = () => {
 }
 
 export default PackingChecklistPage
+

@@ -27,7 +27,7 @@ const EditTripPage = ({ tripId }: EditTripPageProps) => {
   useEffect(() => {
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -83,7 +83,7 @@ const EditTripPage = ({ tripId }: EditTripPageProps) => {
 
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -277,3 +277,4 @@ const EditTripPage = ({ tripId }: EditTripPageProps) => {
 }
 
 export default EditTripPage
+

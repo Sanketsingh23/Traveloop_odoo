@@ -88,7 +88,7 @@ const ItineraryBudgetPage = ({ tripId: initialTripId }: { tripId?: string }) => 
 
   useEffect(() => {
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -385,3 +385,4 @@ const ActivityTimelineItem = ({ activity, compact = false }: { activity: Activit
 )
 
 export default ItineraryBudgetPage
+

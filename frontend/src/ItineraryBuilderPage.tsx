@@ -365,7 +365,7 @@ const ItineraryBuilderPage = ({ tripId }: { tripId: string }) => {
 
   useEffect(() => {
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -536,3 +536,4 @@ const ItineraryBuilderPage = ({ tripId }: { tripId: string }) => {
 }
 
 export default ItineraryBuilderPage
+

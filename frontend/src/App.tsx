@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
+import LandingPage from './LandingPage.tsx'
 import TripsPage from './TripsPage.tsx'
 import CreateTripPage from './CreateTripPage.tsx'
 import EditTripPage from './EditTripPage.tsx'
@@ -171,6 +172,10 @@ const LoginPage = () => {
           <a href="/register" className="font-medium text-slate-700 hover:text-slate-900">Register</a>
         </div>
 
+        <p className="text-center text-xs text-slate-500">
+          <a href="/" className="hover:text-cyan-700">← Back to home</a>
+        </p>
+
         {errorMessage && <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>}
 
         <button
@@ -300,7 +305,7 @@ const RegisterPage = () => {
         </button>
 
         <p className="text-center text-sm text-slate-600">
-          Already have an account? <a href="/" className="font-semibold text-cyan-700">Login</a>
+          Already have an account? <a href="/login" className="font-semibold text-cyan-700">Login</a>
         </p>
       </form>
     </AuthLayout>
@@ -318,7 +323,7 @@ const DashboardPage = () => {
   useEffect(() => {
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -450,10 +455,31 @@ const StatCard = ({ label, value }: { label: string; value: string | number }) =
 )
 
 function App() {
+  // Extract token from URL immediately (before rendering)
+  const urlParams = new URLSearchParams(window.location.search)
+  const tokenFromUrl = urlParams.get('token')
+  const userFromUrl = urlParams.get('user')
+
+  if (tokenFromUrl) {
+    localStorage.setItem('travelloop_token', tokenFromUrl)
+    if (userFromUrl) {
+      localStorage.setItem('travelloop_user', userFromUrl)
+    }
+    // Clean up the URL
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }
+
   const path = window.location.pathname
 
+  // Landing page is the root
+  if (path === '/') return <LandingPage />
+
+  // Auth routes
+  if (path === '/login') return <LoginPage />
   if (path === '/register') return <RegisterPage />
-  if (path === '/dashboard') return <DashboardPage />
+
+  // App routes
+  if (path === '/dashboard') return <LandingPage />
   if (path === '/trips/create') return <CreateTripPage />
   if (path.startsWith('/trips/edit/')) {
     const tripId = path.replace('/trips/edit/', '')
@@ -474,7 +500,8 @@ function App() {
   if (path === '/profile') return <UserProfilePage />
   if (path === '/trips') return <TripsPage />
 
-  return <LoginPage />
+  // Fallback to landing page for unknown routes
+  return <LandingPage />
 }
 
 export default App

@@ -50,7 +50,7 @@ const CreateTripPage = () => {
 
     const token = localStorage.getItem('travelloop_token')
     if (!token) {
-      window.location.href = '/'
+      window.location.href = '/login'
       return
     }
 
@@ -252,3 +252,4 @@ const CreateTripPage = () => {
 }
 
 export default CreateTripPage
+

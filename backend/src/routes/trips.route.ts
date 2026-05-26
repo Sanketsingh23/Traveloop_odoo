@@ -43,19 +43,6 @@ const mapRowToTrip = (row: any) => ({
   coverImage: row.cover_image ?? '',
 })
 
-const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message
-  if (typeof error === 'object' && error !== null && 'message' in error) {
-    return String((error as { message?: unknown }).message)
-  }
-  return 'Unknown error'
-}
-
-const isMissingSupabaseTableError = (error: unknown) => {
-  const message = getErrorMessage(error).toLowerCase()
-  return message.includes('could not find the table') || message.includes('schema cache')
-}
-
 const mapStop = (stop: any, activities: any[] = []) => ({
   id: String(stop.id),
   city: stop.city,
@@ -120,10 +107,7 @@ tripsRouter.get('/', authenticate, async (req, res) => {
     return res.status(200).json({ success: true, trips: (data ?? []).map(mapRowToTrip) })
   } catch (error) {
     console.error('Fetch trips error', error)
-    if (isMissingSupabaseTableError(error)) {
-      return res.status(200).json({ success: true, trips: [] })
-    }
-    return res.status(500).json({ success: false, message: `Failed to load trips: ${getErrorMessage(error)}` })
+    return res.status(500).json({ success: false, message: 'Failed to load trips' })
   }
 })
 
@@ -150,15 +134,7 @@ tripsRouter.get('/recent', authenticate, async (req, res) => {
     })
   } catch (error) {
     console.error('Fetch recent trips error', error)
-    if (isMissingSupabaseTableError(error)) {
-      return res.status(200).json({
-        success: true,
-        trips: [],
-        recommendedDestinations,
-        userLabel: userName,
-      })
-    }
-    return res.status(500).json({ success: false, message: `Failed to load recent trips: ${getErrorMessage(error)}` })
+    return res.status(500).json({ success: false, message: 'Failed to load recent trips' })
   }
 })
 
